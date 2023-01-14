@@ -1,7 +1,9 @@
-package cn.geekhall.util;
+package cn.geekhall.db;
 
 import cn.geekhall.bean.Player;
+import cn.geekhall.mapper.IRowMapper;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -10,27 +12,27 @@ import java.util.List;
  * @author yiny
  * @date 2023/1/14 19:09
  */
-public class PlayerManager {
+public class DBManager {
 
-    private static PlayerManager instance = null;
-    private PlayerManager() {
+    private static DBManager instance = null;
+    private DBManager() {
     }
 
-    public static PlayerManager getInstance() {
+    public static DBManager getInstance() {
         if (instance == null) {
-            instance = new PlayerManager();
+            instance = new DBManager();
         }
         return instance;
     }
 
-    public static List<Player> list() {
+    public static List<Player> list(IRowMapper<Player> rsh) {
         String sql = "select * from h_player";
-        return PlayerTemplate.query(sql);
+        return Collections.singletonList(DBTemplate.query(sql, rsh));
     }
 
-    public static Player get(long id) {
+    public static <T> T get(long id, IRowMapper<T> rsh) {
         String sql = "SELECT * FROM h_player WHERE id = ?";
-        List<Player> list = PlayerTemplate.query(sql, id);
+        List<T> list = Collections.singletonList(DBTemplate.query(sql, rsh, id));
         return list.size() > 0 ? list.get(0) : null;
     }
 
@@ -51,6 +53,4 @@ public class PlayerManager {
         Object[] params = {player.getName(), player.getAge(), player.getEmail()};
         PlayerTemplate.update(sql, params);
     }
-
-
 }

@@ -1,6 +1,7 @@
-package cn.geekhall.util;
+package cn.geekhall.db;
 
 import cn.geekhall.bean.Player;
+import cn.geekhall.util.DBUtil;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
