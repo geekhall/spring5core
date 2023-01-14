@@ -56,9 +56,6 @@ public abstract class AbstractPool {
         }
     }
 
-    // 创建连接池
-    public abstract void createPool();
-
     public static synchronized AbstractPool getInstance() throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
         if (instance == null) {
             instance = (AbstractPool) Class.forName("cn.geekhall.db.ConnectionPool").newInstance();
