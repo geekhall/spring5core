@@ -33,3 +33,8 @@ db.properties
 *.tmp
 *.obj
 
+# build files
+build/
+target/
+
+
