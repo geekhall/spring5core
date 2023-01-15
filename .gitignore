@@ -36,5 +36,7 @@ db.properties
 # build files
 build/
 target/
+out/
+
 
 
