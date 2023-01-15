@@ -8,4 +8,5 @@ package cn.geekhall.designpattern.proxy.staticproxy.sample2;
  */
 public interface IOrderService {
     int createOrder(Order order);
+    Long getCreateTime();
 }

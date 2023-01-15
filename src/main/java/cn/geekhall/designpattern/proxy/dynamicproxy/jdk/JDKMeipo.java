@@ -28,11 +28,11 @@ public class JDKMeipo implements InvocationHandler {
     }
 
     private void before(){
-        System.out.println("我是媒婆：得给你找个异性才行");
-        System.out.println("开始物色");
+        System.out.println("【媒婆】我是媒婆：得给你找个异性才行");
+        System.out.println("【媒婆】开始物色");
     }
 
     private void after(){
-        System.out.println("如果合适的话，就准备办事");
+        System.out.println("【媒婆】如果合适的话，就准备办事");
     }
 }
