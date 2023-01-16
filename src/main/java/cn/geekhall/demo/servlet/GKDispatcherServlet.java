@@ -15,6 +15,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * GKDispatcherServlet
@@ -23,20 +25,21 @@ import java.util.*;
  * @date 2023/1/16 20:30
  */
 public class GKDispatcherServlet extends HttpServlet {
-    private Map<String, Object> mapping = new HashMap<>();
+    private final Map<String, Object> mapping = new HashMap<>();
 
     // 保存所有application.properties的配置信息
-    private Properties contextConfig = new Properties();
+    private final Properties contextConfig = new Properties();
 
     // 保存所有扫描到的类名
-    private List<String> classNames = new ArrayList<>();
+    private final List<String> classNames = new ArrayList<>();
 
     // IoC容器，保存所有初始化的bean
-    private Map<String, Object> ioc = new HashMap<>();
+    private final Map<String, Object> ioc = new HashMap<>();
 
     // 保存url和Method的对应关系
-    private Map<String, Method> handlerMapping = new HashMap<>();
+//    private final Map<String, Method> handlerMapping = new HashMap<>();
 
+    private final List<Handler> handlerMapping = new ArrayList<>();
 
 
     @Override
@@ -55,62 +58,129 @@ public class GKDispatcherServlet extends HttpServlet {
     }
 
     private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception{
+        Handler handler = getHandler(req);
+        if (handler == null){
+            resp.getWriter().write("404 Not Found");
+            return;
+        }
+        Class<?>[] paramTypes = handler.getParamTypes();
+        Object[] paramValues = new Object[paramTypes.length];
+        Map<String, String[]> params = req.getParameterMap();
+        for (Map.Entry<String, String[]> param : params.entrySet()) {
+            String value = Arrays.toString(param.getValue()).replaceAll("\\[|\\]", "").replaceAll(",\\s", ",");
+            if (!handler.paramIndexMapping.containsKey(param.getKey())){
+                continue;
+            }
+            int index = handler.paramIndexMapping.get(param.getKey());
+            paramValues[index] = convert(paramTypes[index], value);
+        }
+        if (handler.paramIndexMapping.containsKey(HttpServletRequest.class.getName())){
+            int reqIndex = handler.paramIndexMapping.get(HttpServletRequest.class.getName());
+            paramValues[reqIndex] = req;
+        }
+        if (handler.paramIndexMapping.containsKey(HttpServletResponse.class.getName())){
+            int respIndex = handler.paramIndexMapping.get(HttpServletResponse.class.getName());
+            paramValues[respIndex] = resp;
+        }
+        Object result = handler.method.invoke(handler.controller, paramValues);
+        if (result == null || result instanceof Void){
+            return;
+        }
+        resp.getWriter().write(result.toString());
+//        String url = req.getRequestURI();
+//        String contextPath = req.getContextPath();
+//        url = url.replaceAll(contextPath, "").replaceAll("/+", "/");
+//
+//        if (!this.handlerMapping.containsKey(url)) {
+//            try {
+//                resp.getWriter().write("404 Not Found!!!");
+//                return;
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//        Method method = this.handlerMapping.get(url);
+//        // 第一个参数：方法所在的实例
+//        // 第二个参数：调用时所需要的实参
+//        Map<String, String[]> params = req.getParameterMap();
+//
+//        // 获取方法的形参列表
+//        Class<?>[] parameterTypes = method.getParameterTypes();
+//
+//        // 保存请求的url参数列表
+//        Object[] paramValues = new Object[parameterTypes.length];
+//
+//        // 根据参数位置动态赋值
+//        for (int i = 0; i < parameterTypes.length; i++) {
+//            Class parameterType = parameterTypes[i];
+//            if (parameterType == HttpServletRequest.class) {
+//                paramValues[i] = req;
+//                continue;
+//            } else if (parameterType == HttpServletResponse.class) {
+//                paramValues[i] = resp;
+//                continue;
+//            } else if (parameterType == String.class) {
+//                // 提取方法中加了注解的参数
+//                Annotation[][] pa = method.getParameterAnnotations();
+//                for (int j = 0; j < pa.length; j++) {
+//                    for (Annotation a : pa[i]) {
+//                        if (a instanceof GKRequestParam) {
+//                            String paramName = ((GKRequestParam) a).value();
+//                            if (!"".equals(paramName.trim())) {
+//                                String value = Arrays.toString(params.get(paramName))
+//                                        .replaceAll("\\[|\\]", "")
+//                                        .replaceAll("\\s", ",");
+//                                paramValues[i] = value;
+//                            }
+//                        }
+//                    }
+//                }
+////                for (Map.Entry<String, String[]> param : params.entrySet()) {
+////                    String value = Arrays.toString(param.getValue()).replaceAll("\\[|\\]", "").replaceAll(",\\s", ",");
+////                    paramValues[i] = value;
+////                }
+//            }
+//        }
+//        String beanName = toLowerFirstCase(method.getDeclaringClass().getSimpleName());
+//        System.out.println(ioc.get(beanName) );
+//        System.out.println("method = " + method);
+//        method.invoke(ioc.get(beanName), new Object[]{req, resp, params.get("name")[0]});
+    }
+
+    /**
+     * 将String类型的参数转换为目标类型
+     * url 传过来的参数都是String类型的，HTTP是基于字符串协议
+     * 只需要把String转换为任意类型就好
+     *
+     * @param type
+     * @param value
+     * @return
+     */
+    private Object convert(Class<?> type, String value){
+        if (Integer.class == type){
+            return Integer.valueOf(value);
+        }
+        return value;
+    }
+    private Handler getHandler(HttpServletRequest req) throws Exception{
+        if (handlerMapping.isEmpty()){
+            return null;
+        }
         String url = req.getRequestURI();
         String contextPath = req.getContextPath();
         url = url.replaceAll(contextPath, "").replaceAll("/+", "/");
-
-        if (!this.handlerMapping.containsKey(url)) {
+        for (Handler handler : handlerMapping) {
             try {
-                resp.getWriter().write("404 Not Found!!!");
-                return;
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        Method method = this.handlerMapping.get(url);
-        // 第一个参数：方法所在的实例
-        // 第二个参数：调用时所需要的实参
-        Map<String, String[]> params = req.getParameterMap();
-
-        // 获取方法的形参列表
-        Class<?>[] parameterTypes = method.getParameterTypes();
-
-        // 保存请求的url参数列表
-        Object[] paramValues = new Object[parameterTypes.length];
-
-        // 根据参数位置动态赋值
-        for (int i = 0; i < parameterTypes.length; i++) {
-            Class parameterType = parameterTypes[i];
-            if (parameterType == HttpServletRequest.class) {
-                paramValues[i] = req;
-                continue;
-            } else if (parameterType == HttpServletResponse.class) {
-                paramValues[i] = resp;
-                continue;
-            } else if (parameterType == String.class) {
-                // 提取方法中加了注解的参数
-                Annotation[][] pa = method.getParameterAnnotations();
-                for (int j = 0; j < pa.length; j++) {
-                    for (Annotation a : pa[i]) {
-                        if (a instanceof GKRequestParam) {
-                            String paramName = ((GKRequestParam) a).value();
-                            if (!"".equals(paramName.trim())) {
-                                String value = Arrays.toString(params.get(paramName))
-                                        .replaceAll("\\[|\\]", "")
-                                        .replaceAll("\\s", ",");
-                                paramValues[i] = value;
-                            }
-                        }
-                    }
+                Matcher matcher = handler.pattern.matcher(url);
+                if (!matcher.matches()){
+                    continue;
                 }
-//                for (Map.Entry<String, String[]> param : params.entrySet()) {
-//                    String value = Arrays.toString(param.getValue()).replaceAll("\\[|\\]", "").replaceAll(",\\s", ",");
-//                    paramValues[i] = value;
-//                }
+                return handler;
+            } catch (Exception e) {
+                throw e;
             }
         }
-        String beanName = toLowerFirstCase(method.getDeclaringClass().getSimpleName());
-        method.invoke(ioc.get(beanName), new Object[]{req, resp, params.get("name")[0]});
+        return null;
     }
 
     @Override
@@ -233,9 +303,13 @@ public class GKDispatcherServlet extends HttpServlet {
                     continue;
                 }
                 GKRequestMapping requestMapping = method.getAnnotation(GKRequestMapping.class);
-                String url = ("/" + baseUrl + "/" + requestMapping.value()).replaceAll("/+", "/");
-                handlerMapping.put(url, method);
-                System.out.println("Mapped " + url + "," + method);
+                String regex = ("/" + baseUrl + "/" + requestMapping.value()).replaceAll("/+", "/");
+                Pattern pattern = Pattern.compile(regex);
+                handlerMapping.add(new Handler(pattern, entry.getValue(), method));
+                System.out.println("Mapped " + regex + "," + method);
+//                String url = ("/" + baseUrl + "/" + requestMapping.value()).replaceAll("/+", "/");
+//                handlerMapping.put(url, method);
+//                System.out.println("Mapped " + url + "," + method);
             }
         }
     }
@@ -334,6 +408,7 @@ public class GKDispatcherServlet extends HttpServlet {
         // 直接从类路径下找到Spring主配置文件所在的路径
         // 并且将其读取出来放到Properties对象中
         // 相当于scanPackage=cn.geekhall.demo 从文件中保存到了内存中
+        System.out.println("[GKDispatcherServlet.doLoadConfig] contextConfigLocation = " + contextConfigLocation);
         InputStream fis = this.getClass().getClassLoader().getResourceAsStream(contextConfigLocation);
         try {
             contextConfig.load(fis);
@@ -386,6 +461,55 @@ public class GKDispatcherServlet extends HttpServlet {
 //                    e.printStackTrace();
 //                }
             }
+        }
+    }
+
+    private class Handler {
+        protected Object controller;   // 保存方法对应的实例
+        protected Method method;       // 保存映射的方法
+        protected Pattern pattern;     // URL的正则匹配
+        protected Map<String, Integer> paramIndexMapping; // 参数顺序
+
+        /**
+         * 构造一个Handler基本的参数
+         * @param controller
+         * @param method
+         */
+        protected Handler(Pattern pattern,Object controller, Method method) {
+            this.controller = controller;
+            this.method = method;
+            this.pattern = pattern;
+
+            paramIndexMapping = new HashMap<String, Integer>();
+            putParamIndexMapping(method);
+        }
+
+        private void putParamIndexMapping(Method method) {
+            // 提取方法中加了注解的参数
+            Annotation[][] pa = method.getParameterAnnotations();
+            for (int i = 0; i < pa.length; i++) {
+                for (Annotation a : pa[i]) {
+                    if (a instanceof GKRequestParam) {
+                        String paramName = ((GKRequestParam) a).value();
+                        if (!"".equals(paramName.trim())) {
+                            paramIndexMapping.put(paramName, i);
+                        }
+                    }
+                }
+            }
+
+            // 提取方法中的request和response参数
+            Class<?>[] paramsTypes = method.getParameterTypes();
+            for (int i = 0; i < paramsTypes.length; i++) {
+                Class<?> type = paramsTypes[i];
+                if (type == HttpServletRequest.class || type == HttpServletResponse.class) {
+                    paramIndexMapping.put(type.getName(), i);
+                }
+            }
+        }
+
+        public Class<?>[] getParamTypes() {
+            return method.getParameterTypes();
         }
     }
 }

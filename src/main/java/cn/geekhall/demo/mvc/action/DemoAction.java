@@ -42,6 +42,15 @@ public class DemoAction {
         }
     }
 
+    @GKRequestMapping("/square")
+    public void square(HttpServletRequest req, HttpServletResponse resp, @GKRequestParam("a") Integer a){
+        try {
+            resp.getWriter().write(a + "的平方是：" + (a * a));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     @GKRequestMapping("/remove")
     public void remove(HttpServletRequest req, HttpServletResponse resp, @GKRequestParam("id") Integer id){
         // ...

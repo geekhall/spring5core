@@ -7,10 +7,6 @@
     <groupId>cn.geekhall</groupId>
     <artifactId>spring5core</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
-    <modules>
-        <module>sxspring1</module>
-    </modules>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -44,4 +40,5 @@
         </dependency>
 
     </dependencies>
+
 </project>
