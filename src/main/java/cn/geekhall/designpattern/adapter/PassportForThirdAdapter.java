@@ -32,7 +32,7 @@ public class PassportForThirdAdapter extends SigninService implements IPassportF
         return null;
     }
 
-    private ResultMsg processLogin(String key, Class<? extends LoginAdapter> clazz) {
+    private ResultMsg processLogin(String key, Class<? extends LoginAdapter> clazz)  {
         System.out.println("PassportForThirdAdapter.processLogin: key = " + key);
         try {
             LoginAdapter adapter = clazz.newInstance();

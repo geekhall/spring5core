@@ -25,6 +25,9 @@ hs_err_pid*
 
 # IDEA settings
 .idea/
+*.iml
+*.ipr
+*.iws
 
 # project files
 db.properties
